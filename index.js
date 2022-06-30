@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const app = express();
 const port = process.env.PORT || 5002;
@@ -34,18 +34,65 @@ async function run() {
     await client.connect();
     const powerCollection = client.db("powerHack").collection("billing-list");
 
-    app.get("/billing-list", async (req, res) => {
+    app.get("/api/billing-list", async (req, res) => {
       const query = {};
       const cursor = powerCollection.find(query);
       const billings = await cursor.toArray();
       res.send(billings);
     });
-    //   app.get("/projects/:id", async (req, res) => {
-    //     const id = req.params.id;
-    //     const query = { _id: ObjectId(id) };
-    //     const portfolio = await portfolioCollection.findOne(query);
-    //     res.send(portfolio);
-    //   });
+
+    app.get("/billings", async (req, res) => {
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
+      const query = {};
+      const cursor = powerCollection.find(query);
+      let bills;
+      if (page || size) {
+        bills = await cursor
+          .skip(page * size)
+          .limit(size)
+          .toArray();
+      } else {
+        bills = await cursor.toArray();
+      }
+      res.send(bills);
+    });
+
+    app.get("/billingCount", async (req, res) => {
+      const count = await powerCollection.estimatedDocumentCount();
+      res.send({ count });
+    });
+    app.post("/api/billing-list", async (req, res) => {
+      const newBill = req.body;
+      const result = await powerCollection.insertOne(newBill);
+      res.send(result);
+    });
+    app.put("/api/update-billing/:id", async (req, res) => {
+      const id = req.params.id;
+      const billingData = req.body;
+      const filter = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          name: billingData.name,
+          email: billingData.email,
+          amount: billingData.amount,
+          phone: billingData.phone,
+        },
+      };
+      const result = await profileCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
+    app.delete("/api/delete-billing/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await powerCollection.deleteOne(query);
+      res.send(result);
+    });
   } finally {
   }
 }
