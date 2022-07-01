@@ -4,10 +4,20 @@ const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const app = express();
+// const checkScopes = requiredScopes("read:messages");
 const port = process.env.PORT || 5002;
 
 app.use(cors());
 app.use(express.json());
+// const { auth } = require("express-oauth2-jwt-bearer");
+// app.use(
+//   auth({
+//     issuer: "https://YOUR_ISSUER_DOMAIN",
+//     audience: "https://my-api.com",
+//     secret: "YOUR SECRET",
+//     tokenSigningAlg: "HS256",
+//   })
+// );
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.njxwr.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
@@ -16,23 +26,70 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
-//a. api/registration
-// b. api/login
-// c. api/billing-list
-// d. api/add-billing
-// e. api/update-billing/:id
-// f. api/delete-billing/:id
-
-// client.connect((err) => {
-//   const collection = client.db("test").collection("devices");
-//   // perform actions on the collection object
-//   client.close();
+// Authorization middleware. When used, the Access Token must
+// exist and be verified against the Auth0 JSON Web Key Set.
+// const checkJwt = auth({
+//   audience: "YOUR_API_IDENTIFIER",
+//   issuerBaseURL: `https://YOUR_DOMAIN/`,
 // });
+
+const verifyJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: "Forbidden access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
 
 async function run() {
   try {
     await client.connect();
     const powerCollection = client.db("powerHack").collection("billing-list");
+
+    app.post("/api/login", async (req, res) => {
+      const user = req.body;
+      const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1d",
+      });
+      res.send({ accessToken });
+    });
+    app.post("/api/registration", async (req, res) => {
+      const user = req.body;
+      const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1d",
+      });
+      res.send({ accessToken });
+    });
+
+    // This route doesn't need authentication
+    app.get("/api/public", function (req, res) {
+      res.json({
+        message:
+          "Hello from a public endpoint! You don't need to be authenticated to see this.",
+      });
+    });
+
+    // This route needs authentication
+    // app.get("/api/private", checkJwt, function (req, res) {
+    //   res.json({
+    //     message:
+    //       "Hello from a private endpoint! You need to be authenticated to see this.",
+    //   });
+    // });
+
+    // app.get("/api/private-scoped", checkJwt, checkScopes, function (req, res) {
+    //   res.json({
+    //     message:
+    //       "Hello from a private endpoint! You need to be authenticated and have a scope of read:messages to see this.",
+    //   });
+    // });
 
     app.get("/api/billing-list", async (req, res) => {
       const query = {};
