@@ -87,7 +87,6 @@ async function run() {
       res.send(result);
     });
 
-    // update billing
     app.patch("/api/update-billing/:id", async (req, res) => {
       const id = req.params.id;
       const body = req.body;
@@ -114,3 +113,5 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`Power Hack website is running on ${port}`);
 });
+
+module.exports = app;
